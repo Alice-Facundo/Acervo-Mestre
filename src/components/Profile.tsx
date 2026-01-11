@@ -1,149 +1,130 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Edit, Plus } from 'lucide-react';
 import { ResourceCard } from './ResourceCard';
 import { PlaylistCard } from './PlaylistCard';
-import { AddResourceModal } from './AddResourceModal';
+import { ResourceModal } from '../modals/ResourceModal';
+import { AddResourceModal } from '../modals/AddResourceModal';
 import { RemoveResourceModal } from './RemoveResourceModal';
-import { AddToPlaylistModal } from './AddToPlaylistModal';
+import { AddToPlaylistModal } from '../modals/AddToPlaylistModal';
 import type { Resource, Playlist } from './types';
 
-// REMOVIDO: import profileImage from 'figma:asset/...'
-
-// ADICIONADO: URL válida para imagem
 const profileImage = "https://ui-avatars.com/api/?name=Carlos+Santos&background=0f766e&color=fff";
+const API_URL = 'https://acervomestrebackend.onrender.com';
 
-const userResources: Resource[] = [
-  {
-    id: '1',
-    title: 'Introdução ao Cálculo Diferencial',
-    author: 'Maria Oliveira',
-    subject: 'Matemática',
-    year: '3º Ano',
-    type: 'PDF',
-    icon: 'download',
-    bgColor: 'bg-green-50',
-    iconColor: 'text-green-400',
-    views: 245,
-    downloads: 89,
-    likes: 34
-  },
-  {
-    id: '2',
-    title: 'Revolução industrial',
-    author: 'Maria Oliveira',
-    subject: 'Matemática',
-    year: '3º Ano',
-    type: 'NOTA',
-    icon: 'document',
-    bgColor: 'bg-red-50',
-    iconColor: 'text-red-400',
-    views: 245,
-    downloads: 89,
-    likes: 34
-  },
-  {
-    id: '3',
-    title: 'Revolução industrial',
-    author: 'Maria Oliveira',
-    subject: 'Matemática',
-    year: '3º Ano',
-    type: 'NOTA',
-    icon: 'document',
-    bgColor: 'bg-red-50',
-    iconColor: 'text-red-400',
-    views: 245,
-    downloads: 89,
-    likes: 34
-  },
-  {
-    id: '4',
-    title: 'Revolução industrial',
-    author: 'Maria Oliveira',
-    subject: 'Matemática',
-    year: '3º Ano',
-    type: 'NOTA',
-    icon: 'document',
-    bgColor: 'bg-red-50',
-    iconColor: 'text-red-400',
-    views: 245,
-    downloads: 89,
-    likes: 34
-  },
-  {
-    id: '5',
-    title: 'Introdução ao Cálculo Diferencial',
-    author: 'Maria Oliveira',
-    subject: 'Matemática',
-    year: '3º Ano',
-    type: 'PDF',
-    icon: 'download',
-    bgColor: 'bg-green-50',
-    iconColor: 'text-green-400',
-    views: 245,
-    downloads: 89,
-    likes: 34
-  },
-  {
-    id: '6',
-    title: 'Introdução ao Cálculo Diferencial',
-    author: 'Maria Oliveira',
-    subject: 'Matemática',
-    year: '3º Ano',
-    type: 'PDF',
-    icon: 'download',
-    bgColor: 'bg-green-50',
-    iconColor: 'text-green-400',
-    views: 245,
-    downloads: 89,
-    likes: 34
-  }
-];
+interface User {
+  id: number;
+  nome?: string;
+  name?: string;
+  email: string;
+  perfil: string;
+  role?: string;
+  url_perfil?: string;
+}
 
-const userPlaylists: Playlist[] = [
-  {
-    id: '1',
-    title: 'Matemática - 3º Ano',
-    resources: 5,
-    visibility: 'Público'
-  },
-  {
-    id: '2',
-    title: 'Matemática - 3º Ano',
-    resources: 5,
-    visibility: 'Público'
-  },
-  {
-    id: '3',
-    title: 'Matemática - 3º Ano',
-    resources: 5,
-    visibility: 'Público'
-  },
-  {
-    id: '4',
-    title: 'Matemática - 3º Ano',
-    resources: 5,
-    visibility: 'Público'
-  },
-  {
-    id: '5',
-    title: 'Matemática - 3º Ano',
-    resources: 5,
-    visibility: 'Público'
-  },
-  {
-    id: '6',
-    title: 'Matemática - 3º Ano',
-    resources: 5,
-    visibility: 'Público'
-  }
-];
+interface ProfileProps {
+  onPlaylistClick: (playlistId: string) => void;
+  onResourceClick: (resourceId: string) => void;
+  user: User | null;
+}
 
-export function Profile({ onPlaylistClick }: { onPlaylistClick: () => void }) {
+export function Profile({ onPlaylistClick, onResourceClick, user }: ProfileProps) {
   const [activeTab, setActiveTab] = useState<'resources' | 'playlists'>('resources');
+  
+  const [myResources, setMyResources] = useState<Resource[]>([]);
+  const [myPlaylists, setMyPlaylists] = useState<Playlist[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
   const [isResourceModalOpen, setIsResourceModalOpen] = useState(false);
   const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
   const [isAddToPlaylistModalOpen, setIsAddToPlaylistModalOpen] = useState(false);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
+
+  const getUserName = () => user?.nome || user?.name || 'Usuário';
+  const getUserProfile = () => user?.perfil || user?.role || 'Visitante';
+  const getUserEmail = () => user?.email || 'email@exemplo.com';
+
+  useEffect(() => {
+    fetchUserContent();
+  }, [user]);
+
+  const fetchUserContent = async () => {
+    setIsLoading(true);
+    try {
+      if (!user?.id) throw new Error("Sem usuário");
+
+      const token = localStorage.getItem('accessToken');
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      };
+
+      const [resResponse, plResponse] = await Promise.all([
+        fetch(`${API_URL}/recursos/get_all?page=1&per_page=100`, { headers }),
+        fetch(`${API_URL}/playlists/get_all?page=1&per_page=100&autor_id=${user.id}`, { headers })
+      ]);
+
+      if (resResponse.ok) {
+        const resData = await resResponse.json();
+        const userResourcesList = (resData.items || [])
+          .filter((item: any) => item.autor_id === user.id)
+          .map((item: any) => {
+            let type = 'Documento';
+            let style = { bgColor: 'bg-blue-50', iconColor: 'text-blue-400', icon: 'file' };
+
+            if (item.estrutura === 'NOTA') {
+              type = 'NOTA';
+              style = { bgColor: 'bg-red-50', iconColor: 'text-red-400', icon: 'document' };
+            } else if (item.estrutura === 'URL') {
+              type = 'LINK';
+              style = { bgColor: 'bg-gray-50', iconColor: 'text-gray-400', icon: 'link' };
+            } else if (item.estrutura === 'UPLOAD') {
+              if (item.mime_type?.includes('pdf')) {
+                type = 'PDF';
+                style = { bgColor: 'bg-green-50', iconColor: 'text-green-400', icon: 'download' };
+              } else if (item.mime_type?.includes('video')) {
+                type = 'Vídeo';
+                style = { bgColor: 'bg-purple-50', iconColor: 'text-purple-400', icon: 'video' };
+              }
+            }
+
+            return {
+              id: `res-${item.id}`,
+              title: item.titulo,
+              author: getUserName(),
+              subject: item.tags?.[0]?.nome || 'Geral',
+              year: '',
+              type: type,
+              icon: style.icon,
+              bgColor: style.bgColor,
+              iconColor: style.iconColor,
+              views: item.visualizacoes,
+              downloads: item.downloads,
+              likes: item.curtidas,
+              isPlaylist: false,
+              is_destaque: item.is_destaque
+            };
+          });
+          setMyResources(userResourcesList);
+      }
+
+      if (plResponse.ok) {
+        const plData = await plResponse.json();
+        const userPlaylistsList = (plData.items || []).map((item: any) => ({
+          id: `pl-${item.id}`,
+          title: item.titulo,
+          resources: item.quantidade_recursos,
+          visibility: 'Público',
+          isPlaylist: true
+        }));
+        setMyPlaylists(userPlaylistsList);
+      }
+
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleRemoveClick = (resource: Resource) => {
     setSelectedResource(resource);
@@ -156,30 +137,39 @@ export function Profile({ onPlaylistClick }: { onPlaylistClick: () => void }) {
   };
 
   const handleConfirmRemove = () => {
-    console.log('Removing resource:', selectedResource);
-    // Add your remove logic here
+    console.log('Removendo recurso:', selectedResource);
+    if (user?.id) fetchUserContent();
   };
 
   const handleAddToPlaylist = (playlistId: string) => {
-    console.log('Adding resource to playlist:', selectedResource, playlistId);
-    // Add your add to playlist logic here
+    console.log('Adicionando recurso à playlist:', selectedResource, playlistId);
+  };
+
+  const getNumericId = (id: string | undefined) => {
+    if (!id) return undefined;
+    const numericPart = id.replace(/\D/g, '');
+    return numericPart ? parseInt(numericPart) : undefined;
+  };
+
+  const handleResourceCardClick = (id: string) => {
+    const numericId = id.replace(/\D/g, '');
+    onResourceClick(numericId);
   };
 
   return (
-    <div className="p-8">
-      {/* Profile Header */}
+    <div className="p-8 w-full min-h-screen">
       <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <img
-              src={profileImage}
-              alt="Carlos Santos"
+              src={user?.url_perfil || profileImage}
+              alt={getUserName()}
               className="w-24 h-24 rounded-full object-cover"
             />
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900 mb-1">Carlos Santos</h1>
-              <p className="text-gray-600 mb-1">coord@escola.edu</p>
-              <p className="text-sm text-gray-500">Coordenador</p>
+              <h1 className="text-2xl font-semibold text-gray-900 mb-1">{getUserName()}</h1>
+              <p className="text-gray-600 mb-1">{getUserEmail()}</p>
+              <p className="text-sm text-gray-500">{getUserProfile()}</p>
             </div>
           </div>
           <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
@@ -189,7 +179,6 @@ export function Profile({ onPlaylistClick }: { onPlaylistClick: () => void }) {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-3 mb-6">
         <button
           onClick={() => setActiveTab('resources')}
@@ -213,7 +202,6 @@ export function Profile({ onPlaylistClick }: { onPlaylistClick: () => void }) {
         </button>
       </div>
 
-      {/* Action Button */}
       <div className="flex justify-end mb-6">
         {activeTab === 'resources' ? (
           <button 
@@ -231,46 +219,67 @@ export function Profile({ onPlaylistClick }: { onPlaylistClick: () => void }) {
         )}
       </div>
 
-      {/* Content */}
-      {activeTab === 'resources' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {userResources.map((resource) => (
-            <ResourceCard 
-              key={resource.id} 
-              resource={resource}
-              onRemoveClick={handleRemoveClick}
-              onAddToPlaylistClick={handleAddToPlaylistClick}
-            />
-          ))}
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <div className="animate-spin h-8 w-8 border-4 border-teal-600 border-t-transparent rounded-full"></div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {userPlaylists.map((playlist) => (
-            <PlaylistCard key={playlist.id} playlist={playlist} onClick={onPlaylistClick} />
-          ))}
-        </div>
+        <>
+          {activeTab === 'resources' ? (
+            myResources.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {myResources.map((resource) => (
+                  <div key={resource.id} onClick={() => handleResourceCardClick(resource.id)} className="cursor-pointer">
+                    <ResourceCard 
+                      resource={resource} 
+                      onRemoveClick={handleRemoveClick}
+                      onAddToPlaylistClick={handleAddToPlaylistClick}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500 bg-white rounded-lg border border-dashed border-gray-300">
+                Você ainda não criou nenhum recurso.
+              </div>
+            )
+          ) : (
+            myPlaylists.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {myPlaylists.map((playlist) => (
+                  <PlaylistCard key={playlist.id} playlist={playlist} onClick={() => onPlaylistClick(playlist.id.replace(/\D/g, ''))} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500 bg-white rounded-lg border border-dashed border-gray-300">
+                Você ainda não criou nenhuma playlist.
+              </div>
+            )
+          )}
+        </>
       )}
 
-      {/* Modals */}
+      <ResourceModal 
+        isOpen={isResourceModalOpen}
+        onClose={() => setIsResourceModalOpen(false)}
+      />
       <AddResourceModal 
         isOpen={isResourceModalOpen}
         onClose={() => setIsResourceModalOpen(false)}
       />
-      
       <RemoveResourceModal
         isOpen={isRemoveModalOpen}
         onClose={() => setIsRemoveModalOpen(false)}
         resourceTitle={selectedResource?.title || ''}
         resourceAuthor={selectedResource?.author || ''}
-        resourceId={selectedResource?.id ? parseInt(selectedResource.id) : undefined}
+        resourceId={getNumericId(selectedResource?.id)}
         onConfirmRemove={handleConfirmRemove}
       />
-      
       <AddToPlaylistModal
         isOpen={isAddToPlaylistModalOpen}
         onClose={() => setIsAddToPlaylistModalOpen(false)}
         resourceTitle={selectedResource?.title || ''}
-        resourceId={selectedResource?.id ? parseInt(selectedResource.id) : undefined}
+        resourceId={getNumericId(selectedResource?.id)}
         onAddToPlaylist={handleAddToPlaylist}
       />
     </div>

@@ -5,15 +5,15 @@ export interface Resource {
   subject: string;
   year: string;
   type: string;
-  icon: 'download' | 'document' | 'link' | 'folder';
+  icon: any;
   bgColor: string;
   iconColor: string;
   views?: number;
   downloads?: number;
   likes?: number;
-  resources?: number;
-  visibility?: string;
   isPlaylist?: boolean;
+  is_destaque?: boolean;
+  estrutura?: 'UPLOAD' | 'URL' | 'NOTA';
 }
 
 export interface Playlist {
@@ -21,4 +21,16 @@ export interface Playlist {
   title: string;
   resources: number;
   visibility: string;
+  author?: string;
+  subject?: string;
+  year?: string;
+  type?: string;
+  icon?: any;
+  bgColor?: string;
+  iconColor?: string;
+  isPlaylist?: boolean;
+  views?: number;
+  downloads?: number;
+  likes?: number;
+  is_destaque?: boolean;
 }
