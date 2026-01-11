@@ -1,0 +1,14 @@
+.app-container {
+  display: flex; 
+  min-height: 100vh;
+  width: 100%;
+  align-items: stretch; 
+}
+
+.app-container > :last-child {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0; 
+}
+
