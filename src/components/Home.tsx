@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Search, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ResourceCard } from './ResourceCard';
-import { ResourceModal } from './ResourceModal';
+import { AddResourceModal } from './AddResourceModal';
 import { RemoveResourceModal } from './RemoveResourceModal';
 import { AddToPlaylistModal } from './AddToPlaylistModal';
 import type { Resource } from './types';
@@ -249,7 +249,7 @@ export function Home() {
       </section>
 
       {/* Modals */}
-      <ResourceModal 
+      <AddResourceModal 
         isOpen={isResourceModalOpen}
         onClose={() => setIsResourceModalOpen(false)}
       />

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Edit, Plus } from 'lucide-react';
 import { ResourceCard } from './ResourceCard';
 import { PlaylistCard } from './PlaylistCard';
-import { ResourceModal } from './ResourceModal';
+import { AddResourceModal } from './AddResourceModal';
 import { RemoveResourceModal } from './RemoveResourceModal';
 import { AddToPlaylistModal } from './AddToPlaylistModal';
 import type { Resource, Playlist } from './types';
@@ -252,7 +252,7 @@ export function Profile({ onPlaylistClick }: { onPlaylistClick: () => void }) {
       )}
 
       {/* Modals */}
-      <ResourceModal 
+      <AddResourceModal 
         isOpen={isResourceModalOpen}
         onClose={() => setIsResourceModalOpen(false)}
       />
