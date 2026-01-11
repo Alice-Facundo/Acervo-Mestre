@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import Sidebar from '../components/Sidebar/Sidebar.js';
-import ConteudoRecurso from '../components/ConteudoRecurso/ConteudoRecurso.js';
+import Sidebar from './Sidebar/Sidebar';
+import ConteudoRecurso from './ConteudoRecurso/ConteudoRecurso';
 import './ConteudoPage.css';
 
 type RouteParams = {
