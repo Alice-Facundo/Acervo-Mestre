@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Download, Heart, Plus, Eye, FileText, Video, Link as LinkIcon, StickyNote, File, ExternalLink } from 'lucide-react';
+import { 
+  ArrowLeft, Download, Heart, Plus, Eye, FileText, 
+  Video, Link as LinkIcon, StickyNote, File, ExternalLink 
+} from 'lucide-react';
 
 const API_URL = 'https://acervomestrebackend.onrender.com';
 
@@ -14,6 +17,7 @@ interface Resource {
   curtidas: number;
   downloads: number;
   autor_nome?: string;
+  autor_id?: number;
   conteudo_markdown?: string;
   url_externa?: string;
   link_acesso?: string;
@@ -22,11 +26,17 @@ interface Resource {
 interface ResourceDetailProps {
   resourceId: string;
   onBack: () => void;
+  onAddToPlaylistClick?: (resourceId: number, title: string) => void; // Prop para abrir o modal no pai
 }
 
-export function ResourceDetail({ resourceId, onBack }: ResourceDetailProps) {
+export function ResourceDetail({ resourceId, onBack, onAddToPlaylistClick }: ResourceDetailProps) {
   const [resource, setResource] = useState<Resource | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Estados para Like
+  const [hasLiked, setHasLiked] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
+  const [localLikes, setLocalLikes] = useState(0);
 
   useEffect(() => {
     if (resourceId) {
@@ -51,11 +61,42 @@ export function ResourceDetail({ resourceId, onBack }: ResourceDetailProps) {
       if (response.ok) {
         const data = await response.json();
         setResource(data);
+        setLocalLikes(data.curtidas);
       }
     } catch (error) {
       console.error("Erro ao buscar recurso:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleLike = async () => {
+    if (isLiking || hasLiked || !resource) return;
+
+    setIsLiking(true);
+    setHasLiked(true);
+    setLocalLikes(prev => prev + 1);
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(`${API_URL}/recursos/${resource.id}/like`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+
+      if (!response.ok) {
+        setHasLiked(false);
+        setLocalLikes(prev => prev - 1);
+      }
+    } catch (error) {
+      console.error("Erro ao curtir:", error);
+      setHasLiked(false);
+      setLocalLikes(prev => prev - 1);
+    } finally {
+      setIsLiking(false);
     }
   };
 
@@ -142,7 +183,6 @@ export function ResourceDetail({ resourceId, onBack }: ResourceDetailProps) {
             </div>
           </div>
           
-          {/* Action Button based on Structure Type */}
           {resource.estrutura !== 'NOTA' && (
             <button 
               onClick={handleMainAction}
@@ -154,7 +194,6 @@ export function ResourceDetail({ resourceId, onBack }: ResourceDetailProps) {
           )}
         </div>
 
-        {/* Content specific for NOTA (Markdown) */}
         {resource.estrutura === 'NOTA' && resource.conteudo_markdown && (
           <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-100 text-gray-700 whitespace-pre-wrap font-sans">
             {resource.conteudo_markdown}
@@ -166,11 +205,22 @@ export function ResourceDetail({ resourceId, onBack }: ResourceDetailProps) {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700">
-              <Heart className="w-5 h-5" />
-              Curtir
+            <button 
+              onClick={handleLike}
+              disabled={hasLiked || isLiking}
+              className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors font-medium
+                ${hasLiked 
+                  ? 'bg-red-50 border-red-200 text-red-600' 
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+            >
+              <Heart className={`w-5 h-5 ${hasLiked ? 'fill-red-600' : ''}`} />
+              {hasLiked ? 'Curtido' : 'Curtir'}
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700">
+            <button 
+              onClick={() => onAddToPlaylistClick?.(resource.id, resource.titulo)}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700 font-medium"
+            >
               <Plus className="w-5 h-5" />
               Adicionar à Playlist
             </button>
@@ -185,8 +235,8 @@ export function ResourceDetail({ resourceId, onBack }: ResourceDetailProps) {
             </div>
             <div className="flex flex-col items-center">
               <div className="flex items-center gap-1 text-gray-600">
-                <Heart className="w-4 h-4" />
-                <span className="font-medium">{resource.curtidas}</span>
+                <Heart className={`w-4 h-4 ${hasLiked ? 'text-red-600 fill-red-600' : ''}`} />
+                <span className="font-medium">{localLikes}</span>
               </div>
               <span className="text-gray-500">curtidas</span>
             </div>
