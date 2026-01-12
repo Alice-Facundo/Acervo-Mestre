@@ -1,4 +1,4 @@
-import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { ListMusic, Type, AlignLeft, X, Save } from 'lucide-react';
 import './Modal.css';
 
