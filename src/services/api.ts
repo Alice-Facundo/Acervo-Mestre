@@ -1,11 +1,9 @@
 const API_BASE_URL = 'https://acervomestrebackend.onrender.com';
 
-// Busca o token usando a chave exata salva no localStorage
 const getAuthToken = (): string | null => {
   return localStorage.getItem('accessToken');
 };
 
-// Helper para criar headers - o Content-Type agora é opcional para evitar erros com FormData ou DELETE
 const getHeaders = (contentType?: string): HeadersInit => {
   const headers: HeadersInit = {};
   
@@ -33,7 +31,22 @@ export interface CreateRecursoData {
   conteudo_markdown?: string;
 }
 
-// Criar um novo recurso usando FormData para suportar arquivos
+export interface UserCreateData {
+  nome: string;
+  email: string;
+  perfil: string;
+  senha?: string;
+  data_nascimento?: string;
+}
+
+export interface UserUpdateData {
+  nome?: string;
+  email?: string;
+  perfil?: string;
+  status?: string;
+  data_nascimento?: string;
+}
+
 export const createRecurso = async (data: CreateRecursoData) => {
   const formData = new FormData();
   
@@ -67,7 +80,6 @@ export const createRecurso = async (data: CreateRecursoData) => {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${getAuthToken()}`,
-      // O navegador define o Content-Type automaticamente com o boundary correto para FormData
     },
     body: formData,
   });
@@ -80,11 +92,10 @@ export const createRecurso = async (data: CreateRecursoData) => {
   return response.json();
 };
 
-// Deletar um recurso
 export const deleteRecurso = async (recursoId: number): Promise<void> => {
   const response = await fetch(`${API_BASE_URL}/recursos/delete/${recursoId}`, {
     method: 'DELETE',
-    headers: getHeaders(), // Apenas Authorization
+    headers: getHeaders(),
   });
   
   if (!response.ok) {
@@ -93,7 +104,6 @@ export const deleteRecurso = async (recursoId: number): Promise<void> => {
   }
 };
 
-// Adicionar recurso à playlist
 export const addRecursoToPlaylist = async (
   playlistId: string,
   recursoId: number
@@ -102,7 +112,7 @@ export const addRecursoToPlaylist = async (
     `${API_BASE_URL}/playlists/add_recurso/${playlistId}`,
     {
       method: 'POST',
-      headers: getHeaders('application/json'), // Define explicitamente para JSON
+      headers: getHeaders('application/json'),
       body: JSON.stringify({ recurso_id: recursoId }),
     }
   );
@@ -115,7 +125,6 @@ export const addRecursoToPlaylist = async (
   return response.json();
 };
 
-// Remover recurso da playlist
 export const removeRecursoFromPlaylist = async (
   playlistId: string,
   recursoId: number
@@ -134,7 +143,6 @@ export const removeRecursoFromPlaylist = async (
   }
 };
 
-// Buscar todas as playlists
 export const getAllPlaylists = async () => {
   const response = await fetch(
     `${API_BASE_URL}/playlists/get_all?page=1&per_page=100`,
@@ -152,7 +160,6 @@ export const getAllPlaylists = async () => {
   return response.json();
 };
 
-// Buscar todas as tags
 export const getAllTags = async () => {
   const response = await fetch(`${API_BASE_URL}/tags/get_all`, {
     method: 'GET',
@@ -165,4 +172,99 @@ export const getAllTags = async () => {
   }
   
   return response.json();
+};
+
+export const createUser = async (data: UserCreateData) => {
+  const response = await fetch(`${API_BASE_URL}/users/create`, {
+    method: 'POST',
+    headers: getHeaders('application/json'),
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Erro ao criar usuário');
+  }
+
+  return response.json();
+};
+
+export const getUser = async (userId: number) => {
+  const response = await fetch(`${API_BASE_URL}/users/get/${userId}`, {
+    method: 'GET',
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Erro ao buscar dados do usuário');
+  }
+
+  return response.json();
+};
+
+export const updateUser = async (userId: number, data: UserUpdateData) => {
+  const response = await fetch(`${API_BASE_URL}/users/patch/${userId}`, {
+    method: 'PATCH',
+    headers: getHeaders('application/json'),
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Erro ao atualizar dados do usuário');
+  }
+
+  return response.json();
+};
+
+export const updateUserImage = async (userId: number, file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_BASE_URL}/users/${userId}/image`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${getAuthToken()}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Erro ao atualizar imagem de perfil');
+  }
+
+  return response.json();
+};
+
+export const restoreUser = async (userId: number) => {
+  const response = await fetch(`${API_BASE_URL}/users/restore/${userId}`, {
+    method: 'PATCH',
+    headers: getHeaders('application/json'),
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Erro ao ativar usuário');
+  }
+
+  return response.json();
+};
+
+export const deleteUser = async (userId: number) => {
+  const response = await fetch(`${API_BASE_URL}/users/delete/${userId}`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+  });
+
+  if (response.status === 204) {
+    return;
+  }
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Erro ao desativar usuário');
+  }
 };

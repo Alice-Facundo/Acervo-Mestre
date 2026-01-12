@@ -1,23 +1,30 @@
 import { useState, useEffect } from 'react';
-import { Search, UserPlus, Edit } from 'lucide-react';
+import { Search, UserPlus, Edit, Loader2, AlertCircle } from 'lucide-react';
 import { MetadataManagement } from './MetadataManagement';
+import CadastrarUserModal from '../modals/CadastrarUserModal';
+import EditarUserModal from '../modals/EditarUserModal';
+import { restoreUser, deleteUser } from '../services/api';
 
 interface User {
-  id: string;
+  id: number;
   name: string;
   email: string;
   role: string;
-  status: 'Ativo' | 'Inativo';
+  status: 'Ativo' | 'Inativo' | 'AguardandoAtivacao';
 }
 
-const API_URL = '/api';
+const API_URL = 'https://acervomestrebackend.onrender.com';
 
 export function AdminPanel() {
   const [activeTab, setActiveTab] = useState<'users' | 'metadata'>('users');
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState<number | null>(null);
   const [error, setError] = useState('');
+  
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
 
   useEffect(() => {
     if (activeTab === 'users') {
@@ -50,7 +57,7 @@ export function AdminPanel() {
         const roleName = item.perfil?.nome || (typeof item.perfil === 'string' ? item.perfil : null) || item.role || 'Indefinido';
 
         return {
-          id: item.id ? item.id.toString() : Math.random().toString(),
+          id: item.id,
           name: item.nome || item.name || 'Sem Nome',
           email: item.email || 'sem@email.com',
           role: roleName,
@@ -67,8 +74,40 @@ export function AdminPanel() {
     }
   };
 
+  const handleToggleStatus = async (user: User) => {
+    const isAtivo = user.status === 'Ativo';
+    const action = isAtivo ? 'desativar' : 'ativar';
+    
+    if (!window.confirm(`Tem certeza que deseja ${action} o usuário ${user.name}?`)) {
+      return;
+    }
+
+    setIsProcessing(user.id);
+    try {
+      if (isAtivo) {
+        await deleteUser(user.id);
+      } else {
+        await restoreUser(user.id);
+      }
+      
+      await fetchUsers();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || `Erro ao ${action} usuário`);
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  const handleOperationSuccess = () => {
+    fetchUsers();
+    setIsCreateModalOpen(false);
+    setEditingUserId(null);
+  };
+
   const filteredUsers = users.filter(user =>
-    (user.name || '').toLowerCase().includes(searchQuery.toLowerCase())
+    (user.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (user.email || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -105,20 +144,24 @@ export function AdminPanel() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Pesquisar por nome..."
+                placeholder="Pesquisar por nome ou e-mail..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50"
               />
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors">
+            <button 
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+            >
               <UserPlus className="w-5 h-5" />
               Cadastrar Novo Usuário
             </button>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
+            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
               {error}
             </div>
           )}
@@ -168,15 +211,24 @@ export function AdminPanel() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <button
-                              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                              onClick={() => handleToggleStatus(user)}
+                              disabled={isProcessing === user.id}
+                              className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-2 ${
                                 user.status === 'Ativo'
-                                  ? 'text-gray-700 hover:bg-gray-100'
+                                  ? 'text-red-600 hover:bg-red-50'
                                   : 'text-green-700 hover:bg-green-50'
-                              }`}
+                              } disabled:opacity-50`}
                             >
-                              {user.status === 'Ativo' ? 'Desativar' : 'Ativar'}
+                              {isProcessing === user.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                user.status === 'Ativo' ? 'Desativar' : 'Ativar'
+                              )}
                             </button>
-                            <button className="p-1.5 hover:bg-gray-100 rounded transition-colors">
+                            <button 
+                              onClick={() => setEditingUserId(user.id)}
+                              className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+                            >
                               <Edit className="w-4 h-4 text-gray-600" />
                             </button>
                           </div>
@@ -194,6 +246,19 @@ export function AdminPanel() {
       {activeTab === 'metadata' && (
         <MetadataManagement />
       )}
+
+      <CadastrarUserModal 
+        isOpen={isCreateModalOpen} 
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleOperationSuccess}
+      />
+
+      <EditarUserModal
+        isOpen={!!editingUserId}
+        onClose={() => setEditingUserId(null)}
+        userId={editingUserId}
+        onSuccess={handleOperationSuccess}
+      />
     </div>
   );
 }

@@ -1,11 +1,13 @@
-import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-import { User, Mail, Shield, Calendar, X, Save } from 'lucide-react';
-import './Modal.css';
+import React, { useState, useEffect } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
+import { User, Mail, Shield, Calendar, X, Save, Loader2 } from 'lucide-react';
+import { getUser, updateUser } from '../services/api';
 
 interface EditarUserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  userId: string | number | null;
+  userId: number | null;
+  onSuccess?: () => void;
 }
 
 interface UserFormData {
@@ -15,7 +17,7 @@ interface UserFormData {
   dataNascimento: string;
 }
 
-const EditarUserModal: React.FC<EditarUserModalProps> = ({ isOpen, onClose, userId }) => {
+const EditarUserModal: React.FC<EditarUserModalProps> = ({ isOpen, onClose, userId, onSuccess }) => {
   const [formData, setFormData] = useState<UserFormData>({
     nome: '',
     email: '',
@@ -26,37 +28,32 @@ const EditarUserModal: React.FC<EditarUserModalProps> = ({ isOpen, onClose, user
   const [loadingGet, setLoadingGet] = useState<boolean>(true);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen || !userId) {
       setFormData({ nome: '', email: '', perfil: '', dataNascimento: '' });
       return;
     }
 
-    if (userId) {
-      const carregarUsuario = async () => {
-        setLoadingGet(true);
-        const token = localStorage.getItem('token_acervo');
-        try {
-          const response = await fetch(`https://acervomestrebackend.onrender.com/users/get/${userId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (response.ok) {
-            const data = await response.json();
-            setFormData({
-              nome: data.nome || '',
-              email: data.email || '',
-              perfil: data.perfil || '',
-              dataNascimento: data.data_nascimento || ''
-            });
-          }
-        } catch (error) {
-          console.error("Erro ao carregar usuário:", error);
-        } finally {
-          setLoadingGet(false);
-        }
-      };
-      carregarUsuario();
-    }
-  }, [isOpen, userId]);
+    const carregarUsuario = async () => {
+      setLoadingGet(true);
+      try {
+        const data = await getUser(userId);
+        setFormData({
+          nome: data.nome || '',
+          email: data.email || '',
+          perfil: data.perfil || '',
+          dataNascimento: data.data_nascimento || ''
+        });
+      } catch (error) {
+        console.error("Erro ao carregar usuário:", error);
+        alert("Não foi possível carregar os dados do usuário.");
+        onClose();
+      } finally {
+        setLoadingGet(false);
+      }
+    };
+
+    carregarUsuario();
+  }, [isOpen, userId, onClose]);
 
   if (!isOpen) return null;
 
@@ -67,9 +64,8 @@ const EditarUserModal: React.FC<EditarUserModalProps> = ({ isOpen, onClose, user
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    const temCamposVazios = Object.values(formData).some(valor => String(valor).trim() === "");
-    if (temCamposVazios) {
-      alert("Erro: Todos os campos são obrigatórios. Por favor, preencha todos os dados.");
+    if (!formData.nome.trim() || !formData.email.trim() || !formData.perfil) {
+      alert("Erro: Nome, E-mail e Perfil são obrigatórios.");
       return;
     }
 
@@ -79,88 +75,93 @@ const EditarUserModal: React.FC<EditarUserModalProps> = ({ isOpen, onClose, user
       return;
     }
 
-    const token = localStorage.getItem('token_acervo');
-    const dadosParaEnvio = {
-      nome: formData.nome,
-      email: formData.email,
-      perfil: formData.perfil,
-      data_nascimento: formData.dataNascimento
-    };
+    if (!userId) return;
 
     try {
       setLoading(true);
-      const response = await fetch(`https://acervomestrebackend.onrender.com/users/patch/${userId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(dadosParaEnvio)
-      });
+      
+      const dadosParaEnvio = {
+        nome: formData.nome,
+        email: formData.email,
+        perfil: formData.perfil,
+        data_nascimento: formData.dataNascimento
+      };
 
-      if (response.ok) {
-        alert("Usuário atualizado com sucesso!");
-        onClose();
-      } else {
-        const errorData = await response.json();
-        alert(`Erro na atualização: ${errorData.detail || 'Falha na requisição'}`);
-      }
-    } catch (error) {
-      alert("Erro de conexão com o servidor.");
+      await updateUser(userId, dadosParaEnvio);
+
+      alert("Usuário atualizado com sucesso!");
+      if (onSuccess) onSuccess();
+      onClose();
+    } catch (error: any) {
+      console.error(error);
+      alert(`Erro na atualização: ${error.message || 'Falha na requisição'}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-container">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg w-full max-w-md shadow-xl overflow-hidden">
         {loadingGet ? (
-          <div className="spinner-container">
-            <div className="spinner"></div>
+          <div className="flex justify-center items-center h-48">
+            <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
           </div>
         ) : (
           <>
-            <header className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <User size={24} color="#0c5a6d" />
-                <h2>Editar Usuário</h2>
+            <header className="flex items-center justify-between p-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <User className="w-6 h-6 text-teal-700" />
+                <h2 className="text-lg font-semibold text-gray-900">Editar Usuário</h2>
               </div>
-              <button className="close-modal-btn" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={24} color="#6c757d" />
+              <button 
+                onClick={onClose} 
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
               </button>
             </header>
 
-            <form onSubmit={handleSubmit} className="modal-form" noValidate>
-              <div className="input-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <User size={16} /> Nome Completo
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+                  <User className="w-4 h-4" /> Nome Completo
                 </label>
                 <input 
                   type="text" 
                   name="nome" 
                   value={formData.nome} 
                   onChange={handleChange} 
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  required
                 />
               </div>
 
-              <div className="input-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Mail size={16} /> E-mail
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+                  <Mail className="w-4 h-4" /> E-mail
                 </label>
                 <input 
                   type="email" 
                   name="email" 
                   value={formData.email} 
                   onChange={handleChange} 
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  required
                 />
               </div>
 
-              <div className="input-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Shield size={16} /> Perfil
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+                  <Shield className="w-4 h-4" /> Perfil
                 </label>
-                <select name="perfil" value={formData.perfil} onChange={handleChange}>
+                <select 
+                  name="perfil" 
+                  value={formData.perfil} 
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  required
+                >
                   <option value="">Selecione um perfil</option>
                   <option value="Gestor">Gestor</option>
                   <option value="Coordenador">Coordenador</option>
@@ -169,30 +170,35 @@ const EditarUserModal: React.FC<EditarUserModalProps> = ({ isOpen, onClose, user
                 </select>
               </div>
 
-              <div className="input-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Calendar size={16} /> Data de Nascimento
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+                  <Calendar className="w-4 h-4" /> Data de Nascimento
                 </label>
                 <input 
                   type="date" 
                   name="dataNascimento" 
                   value={formData.dataNascimento} 
                   onChange={handleChange} 
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
 
-              <div className="modal-actions">
-                <button type="button" className="btn-cancel" onClick={onClose} disabled={loading}>
+              <div className="pt-4 flex gap-3">
+                <button 
+                  type="button" 
+                  onClick={onClose} 
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={loading}
+                >
                   Cancelar
                 </button>
                 <button 
                   type="submit" 
-                  className="btn-save" 
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                   disabled={loading}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
                 >
-                  <Save size={18} />
-                  {loading ? 'Salvando...' : 'Salvar Alterações'}
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Salvar Alterações
                 </button>
               </div>
             </form>

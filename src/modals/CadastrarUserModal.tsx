@@ -1,10 +1,13 @@
-import React, { useState, ChangeEvent, FormEvent } from 'react';
-import { UserPlus, X, CheckCircle, Calendar, Lock, Mail, User } from 'lucide-react';
+import React, { useState } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
+import { UserPlus, X, CheckCircle, Calendar, Lock, Mail, User, Loader2 } from 'lucide-react';
+import { createUser } from '../services/api';
 import './Modal.css';
 
 interface CadastrarUserModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 interface UserFormData {
@@ -15,7 +18,7 @@ interface UserFormData {
   perfil: string;
 }
 
-const CadastrarUserModal: React.FC<CadastrarUserModalProps> = ({ isOpen, onClose }) => {
+const CadastrarUserModal: React.FC<CadastrarUserModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [formData, setFormData] = useState<UserFormData>({
     nome: '',
     email: '',
@@ -23,6 +26,7 @@ const CadastrarUserModal: React.FC<CadastrarUserModalProps> = ({ isOpen, onClose
     dataNascimento: '',
     perfil: ''
   });
+  const [isLoading, setIsLoading] = useState(false);
 
   if (!isOpen) return null;
 
@@ -33,10 +37,8 @@ const CadastrarUserModal: React.FC<CadastrarUserModalProps> = ({ isOpen, onClose
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    const temCamposVazios = Object.values(formData).some(valor => valor.trim() === "");
-
-    if (temCamposVazios) {
-      alert("Erro: Todos os campos são obrigatórios. Por favor, preencha todos os dados.");
+    if (!formData.nome.trim() || !formData.email.trim() || !formData.perfil || !formData.dataNascimento) {
+      alert("Erro: Nome, E-mail, Perfil e Data de Nascimento são obrigatórios.");
       return;
     }
 
@@ -46,34 +48,37 @@ const CadastrarUserModal: React.FC<CadastrarUserModalProps> = ({ isOpen, onClose
       return;
     }
 
-    const token = localStorage.getItem('token_acervo');
-    const dadosParaEnvio = {
-      nome: formData.nome,
-      email: formData.email,
-      perfil: formData.perfil,
-      senha: formData.senha,
-      data_nascimento: formData.dataNascimento
-    };
+    setIsLoading(true);
 
     try {
-      const response = await fetch('https://acervomestrebackend.onrender.com/users/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(dadosParaEnvio)
+      const dadosParaEnvio = {
+        nome: formData.nome,
+        email: formData.email,
+        perfil: formData.perfil,
+        data_nascimento: formData.dataNascimento,
+        ...(formData.senha.trim() && { senha: formData.senha }) 
+      };
+
+      await createUser(dadosParaEnvio);
+
+      alert("Usuário cadastrado com sucesso!");
+      
+      setFormData({
+        nome: '',
+        email: '',
+        senha: '',
+        dataNascimento: '',
+        perfil: ''
       });
 
-      if (response.ok) {
-        alert("Usuário cadastrado com sucesso!");
-        onClose();
-      } else {
-        const errorData = await response.json();
-        alert(`Erro no cadastro: ${errorData.detail || 'Falha na requisição'}`);
-      }
-    } catch (error) {
-      alert("Erro de conexão com o servidor.");
+      if (onSuccess) onSuccess();
+      onClose();
+
+    } catch (error: any) {
+      console.error(error);
+      alert(`Erro no cadastro: ${error.message || 'Falha na requisição'}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -97,7 +102,7 @@ const CadastrarUserModal: React.FC<CadastrarUserModalProps> = ({ isOpen, onClose
         <form onSubmit={handleSubmit} className="modal-form" noValidate>
           <div className="input-group">
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <User size={16} /> Nome Completo
+              <User size={16} /> Nome Completo *
             </label>
             <input 
               type="text" 
@@ -105,12 +110,13 @@ const CadastrarUserModal: React.FC<CadastrarUserModalProps> = ({ isOpen, onClose
               placeholder="Digite seu nome" 
               value={formData.nome}
               onChange={handleChange} 
+              required
             />
           </div>
 
           <div className="input-group">
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Mail size={16} /> E-mail
+              <Mail size={16} /> E-mail *
             </label>
             <input 
               type="email" 
@@ -118,11 +124,12 @@ const CadastrarUserModal: React.FC<CadastrarUserModalProps> = ({ isOpen, onClose
               placeholder="exemplo@email.com" 
               value={formData.email}
               onChange={handleChange} 
+              required
             />
           </div>
 
           <div className="input-group">
-            <label>Perfil</label>
+            <label>Perfil *</label>
             <select name="perfil" value={formData.perfil} onChange={handleChange} required>
               <option value="">Selecione um perfil</option>
               <option value="Gestor">Gestor</option>
@@ -135,7 +142,7 @@ const CadastrarUserModal: React.FC<CadastrarUserModalProps> = ({ isOpen, onClose
           <div className="form-row">
             <div className="input-group">
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Lock size={16} /> Senha
+                <Lock size={16} /> Senha (Opcional)
               </label>
               <input 
                 type="password" 
@@ -148,27 +155,30 @@ const CadastrarUserModal: React.FC<CadastrarUserModalProps> = ({ isOpen, onClose
 
             <div className="input-group">
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Calendar size={16} /> Nascimento
+                <Calendar size={16} /> Nascimento *
               </label>
               <input 
                 type="date" 
                 name="dataNascimento" 
                 value={formData.dataNascimento}
                 onChange={handleChange} 
+                required
               />
             </div>
           </div>
 
           <div className="modal-actions">
-            <button type="button" className="btn-cancel" onClick={onClose}>
+            <button type="button" className="btn-cancel" onClick={onClose} disabled={isLoading}>
               Cancelar
             </button>
             <button 
               type="submit" 
               className="btn-save" 
+              disabled={isLoading}
               style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
             >
-              <CheckCircle size={18} /> Cadastrar Usuário
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle size={18} />}
+              Cadastrar Usuário
             </button>
           </div>
         </form>
